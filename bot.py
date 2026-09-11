@@ -1,0 +1,108 @@
+import os
+import time
+import telebot
+import requests
+import schedule
+import threading
+
+# توکن ربات را اینجا وارد کنید (یا از متغیر محیطی بخوانید)
+TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8843306337:AAETfKGd3xS33l-zegksMfUNBQu4zPzB5EM')
+
+bot = telebot.TeleBot(TOKEN)
+
+# فایل ذخیره‌سازی کاربران
+USER_FILE = "subscribed_users.txt"
+
+def load_users():
+    if os.path.exists(USER_FILE):
+        with open(USER_FILE, "r") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def save_user(chat_id):
+    users = load_users()
+    users.add(str(chat_id))
+    with open(USER_FILE, "w") as f:
+        for user in users:
+            f.write(f"{user}\n")
+
+def remove_user(chat_id):
+    users = load_users()
+    users.discard(str(chat_id))
+    with open(USER_FILE, "w") as f:
+        for user in users:
+            f.write(f"{user}\n")
+
+# دریافت قیمت دلار از API رایگان
+def get_dollar_price():
+    try:
+        # API رایگان بدون نیاز به کلید
+        response = requests.get("https://open.er-api.com/v6/latest/USD", timeout=10)
+        data = response.json()
+        
+        if data.get("result") == "success":
+            usd_to_irr = data["rates"]["IRR"]
+            usd_to_toman = int(usd_to_irr / 10)
+            return f"{usd_to_toman:,} تومان"
+        else:
+            return "⚠️ خطا در دریافت قیمت"
+    except Exception as e:
+        print(f"خطا در دریافت قیمت: {e}")
+        return "⚠️ خطا در اتصال به سرور. لطفاً دقایقی دیگر تلاش کنید."
+
+# ارسال قیمت به همه کاربران
+def broadcast_price():
+    price = get_dollar_price()
+    message = f"💵 *قیمت لحظه‌ای دلار*\n\n🔹 {price}\n\n🤖 _هر ۵ دقیقه به‌روزرسانی می‌شود._"
+    
+    users = load_users()
+    for chat_id in users:
+        try:
+            bot.send_message(chat_id, message, parse_mode="Markdown")
+        except Exception as e:
+            print(f"خطا در ارسال به {chat_id}: {e}")
+            remove_user(chat_id)
+
+# زمان‌بندی هر ۵ دقیقه
+schedule.every(5).minutes.do(broadcast_price)
+
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+# شروع زمان‌بند در پس‌زمینه
+scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+scheduler_thread.start()
+
+# دستور /start
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    chat_id = message.chat.id
+    save_user(chat_id)
+    price = get_dollar_price()
+    bot.reply_to(
+        message, 
+        f"سلام {message.from_user.first_name}! 👋\n"
+        f"✅ شما در لیست اطلاع‌رسانی قرار گرفتید.\n"
+        f"هر ۵ دقیقه قیمت دلار برای شما ارسال می‌شود.\n\n"
+        f"💰 قیمت فعلی: *{price}*\n\n"
+        f"برای لغو: /stop",
+        parse_mode="Markdown"
+    )
+
+# دستور /stop
+@bot.message_handler(commands=['stop'])
+def stop_updates(message):
+    chat_id = message.chat.id
+    remove_user(chat_id)
+    bot.reply_to(message, "❌ اطلاع‌رسانی غیرفعال شد.\nبرای فعال‌سازی مجدد: /start")
+
+# دستور /price (دریافت قیمت لحظه‌ای)
+@bot.message_handler(commands=['price'])
+def get_price_now(message):
+    price = get_dollar_price()
+    bot.reply_to(message, f"💰 قیمت فعلی دلار: *{price}*", parse_mode="Markdown")
+
+print("✅ ربات در حال اجراست...")
+bot.infinity_polling()
