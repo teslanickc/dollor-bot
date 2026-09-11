@@ -36,19 +36,26 @@ def remove_user(chat_id):
 # دریافت قیمت دلار از API رایگان
 def get_dollar_price():
     try:
-        # API رایگان بدون نیاز به کلید
-        response = requests.get("https://open.er-api.com/v6/latest/USD", timeout=10)
+        # API نوبیتکس - نرخ تتر (USDT) ≈ دلار بازار آزاد
+        response = requests.get("https://api.nobitex.ir/v3/orderbook/USDTIRT", timeout=10)
         data = response.json()
         
-        if data.get("result") == "success":
-            usd_to_irr = data["rates"]["IRR"]
-            usd_to_toman = int(usd_to_irr / 10)
-            return f"{usd_to_toman:,} تومان"
+        if "lastTradePrice" in data:
+            price_rial = int(data["lastTradePrice"])
+            price_toman = price_rial // 10
+            return f"{price_toman:,} تومان"
         else:
             return "⚠️ خطا در دریافت قیمت"
     except Exception as e:
         print(f"خطا در دریافت قیمت: {e}")
-        return "⚠️ خطا در اتصال به سرور. لطفاً دقایقی دیگر تلاش کنید."
+        try:
+            # API جایگزین: تترلند
+            response2 = requests.get("https://api.tetherland.com/currencies", timeout=10)
+            data2 = response2.json()
+            price = data2["data"]["currencies"]["USDT"]["price"]
+            return f"{int(price):,} تومان"
+        except Exception:
+            return "⚠️ خطا در اتصال. لطفاً دقایقی دیگر تلاش کنید."
 
 # ارسال قیمت به همه کاربران
 def broadcast_price():
