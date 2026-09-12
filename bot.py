@@ -1,28 +1,26 @@
 import os
-import random
 import telebot
 import threading
 from flask import Flask
 from telebot import types
 
-TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'توکن_ربات_خودت')
+TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+
+if not TOKEN:
+    print("❌ خطا: توکن پیدا نشد!")
+else:
+    print("✅ توکن با موفقیت خوانده شد.")
+
 bot = telebot.TeleBot(TOKEN)
 
-love_messages = [
-    "تو بهترین اتفاقی هستی که تو زندگیم افتاده ❤️",
-    "یادته اولین بار که همدیگه رو دیدیم چقدر استرس داشتم؟ 😄",
-    "چشمات قشنگ‌ترین چیز دنیاست ✨",
-    "مرسی که همیشه هستی و حالمو خوب می‌کنی 🥰",
-    "دوستت دارم، بیشتر از دیروز و کمتر از فردا!"
-]
-
+# ساخت دکمه‌های شیشه‌ای با حالت‌های جدید
 def get_mood_keyboard():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
+        types.InlineKeyboardButton("دلتنگتم 🥺", callback_data="mood_miss"),
         types.InlineKeyboardButton("خسته‌م 😔", callback_data="mood_tired"),
-        types.InlineKeyboardButton("دلتنگتم ", callback_data="mood_miss"),
-        types.InlineKeyboardButton("خوشحالم ", callback_data="mood_happy"),
-        types.InlineKeyboardButton("یه چیز بامزه بگو 😂", callback_data="mood_funny")
+        types.InlineKeyboardButton("خوشحالم 😄", callback_data="mood_happy"),
+        types.InlineKeyboardButton("غمگینم 💔", callback_data="mood_sad")
     )
     return markup
 
@@ -31,30 +29,30 @@ def send_welcome(message):
     name = message.from_user.first_name
     bot.reply_to(
         message,
-        f"سلام {name} جان! 👋❤️\n"
-        f"این ربات فقط برای تو ساخته شده تا هر وقت خواستی حال دلت رو بگی یا یه لبخند روی لبت بیاد.\n"
+        f"سلام {name} جانِ من! 👋❤️\n"
+        f"این ربات فقط برای تو ساخته شده تا هر وقت خواستی حال دلت رو بگی، من اینجام.\n"
         f"یکی از دکمه‌های پایین رو انتخاب کن 👇",
         reply_markup=get_mood_keyboard()
     )
 
-@bot.message_handler(commands=['love'])
-def send_random_love(message):
-    msg = random.choice(love_messages)
-    bot.reply_to(message, f"💌 پیام مخصوص تو:\n\n{msg}")
-
 @bot.callback_query_handler(func=lambda call: True)
 def handle_mood(call):
     chat_id = call.message.chat.id
+    response = ""
     
-    if call.data == "mood_tired":
-        response = "زود برو استراحت کن عزیزم. تو امروز خیلی زحمت کشیدی. یه چای یا قهوه برای خودت بریز ☕️💖"
-    elif call.data == "mood_miss":
-        response = "منم همینطور! کاش الان پیشت بودم و محکم بغلت می‌کردم. زود می‌بینمت ❤️"
+    if call.data == "mood_miss":
+        response = "یادته اولین قرارمون؟ اولین باری که دستتو گرفتم، همونجا دلم برات لرزید... ❤️"
+        
+    elif call.data == "mood_tired":
+        response = "می‌دونم روز خسته‌کننده‌ای بوده عشقم. من اینجام، پیشتم. هر وقت خواستی فقط کافیه یه زنگ بهم بزنی. 🫂☕️"
+        
     elif call.data == "mood_happy":
-        response = "خندیدن تو، دنیای منو قشنگ می‌کنه. همیشه همینطور بخند 😍🌟"
-    elif call.data == "mood_funny":
-        response = "می‌دونی چرا برنامه‌نویسا عینک می‌زنن؟ چون نمی‌تونن C# (سی‌شارپ) کنن! 😂 (ببخشید بد بود ولی خندیدی دیگه!)"
+        response = "یادته لازانیایی که اون شب خونه ما درست کردی؟ من هر وقت به اون فکر می‌کنم، خوشحال می‌شم. 😍🍝"
+        
+    elif call.data == "mood_sad":
+        response = "هر وقت غمگین می‌شم پانیذ جان، به این فکر می‌کنم که ما با هم ۱۷، ۱۸ سالگی اون جنگ و همه اون بدبختی‌ها رو گذروندیم. پس انقدر رابطه‌مون قویه که می‌تونیم با هم به هر چی می‌خوایم برسیم. 💪❤️"
     
+    # آپدیت کردن پیام قبلی با پیام جدید
     bot.edit_message_text(
         text=response,
         chat_id=chat_id,
@@ -62,12 +60,12 @@ def handle_mood(call):
     )
     bot.answer_callback_query(call.id)
 
-# --- اضافه کردن Flask برای باز نگه داشتن پورت در Render ---
+# --- بخش Flask برای بیدار نگه داشتن رندر ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ ربات عشق در حال اجراست! ❤️"
+    return "✅ ربات عشق پانیذ در حال اجراست! ❤️"
 
 @app.route('/health')
 def health():
@@ -77,9 +75,10 @@ def run_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, threaded=True)
 
+# اجرای فلask در یک ترد جداگانه
 flask_thread = threading.Thread(target=run_flask, daemon=True)
 flask_thread.start()
 
-print("✅ ربات عشق در حال اجراست...")
+# اجرای ربات (بدون هیچ فاصله اضافی در ابتدای خط)
+print("🚀 ربات در حال اجراست...")
 bot.infinity_polling(timeout=60)
-
