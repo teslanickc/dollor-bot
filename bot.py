@@ -81,4 +81,5 @@ flask_thread = threading.Thread(target=run_flask, daemon=True)
 flask_thread.start()
 
 print("✅ ربات عشق در حال اجراست...")
-   bot.infinity_polling(timeout=60)
+bot.infinity_polling(timeout=60)
+
