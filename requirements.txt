@@ -1,4 +1,2 @@
 pyTelegramBotAPI
-requests
-schedule
 flask
