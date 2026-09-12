@@ -4,16 +4,17 @@ import threading
 from flask import Flask
 from telebot import types
 
+# دریافت توکن از تنظیمات سرور
 TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 if not TOKEN:
-    print("❌ خطا: توکن پیدا نشد!")
+    print("❌ خطا: توکن پیدا نشد! لطفاً Environment Variable را چک کنید.")
 else:
     print("✅ توکن با موفقیت خوانده شد.")
 
 bot = telebot.TeleBot(TOKEN)
 
-# ساخت دکمه‌های شیشه‌ای با حالت‌های جدید
+# ساخت دکمه‌های شیشه‌ای
 def get_mood_keyboard():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -37,30 +38,34 @@ def send_welcome(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_mood(call):
-    chat_id = call.message.chat.id
-    response = ""
-    
-    if call.data == "mood_miss":
-        response = "یادته اولین قرارمون؟ اولین باری که دستتو گرفتم، همونجا دلم برات لرزید... ❤️"
+    try:
+        chat_id = call.message.chat.id
+        response = ""
         
-    elif call.data == "mood_tired":
-        response = "می‌دونم روز خسته‌کننده‌ای بوده عشقم. من اینجام، پیشتم. هر وقت خواستی فقط کافیه یه زنگ بهم بزنی. 🫂☕️"
+        if call.data == "mood_miss":
+            response = "یادته اولین قرارمون؟ اولین باری که دستتو گرفتم، همونجا دلم برات لرزید... ❤️"
+        elif call.data == "mood_tired":
+            response = "می‌دونم روز خسته‌کننده‌ای بوده عشقم. من اینجام، پیشتم. هر وقت خواستی فقط کافیه یه زنگ بهم بزنی. 🫂☕️"
+        elif call.data == "mood_happy":
+            response = "یادته لازانیایی که اون شب خونه ما درست کردی؟ من هر وقت به اون فکر می‌کنم، خوشحال می‌شم. 😍🍝"
+        elif call.data == "mood_sad":
+            response = "هر وقت غمگین می‌شم پانیذ جان، به این فکر می‌کنم که ما با هم ۱۷، ۱۸ سالگی اون جنگ و همه اون بدبختی‌ها رو گذروندیم. پس انقدر رابطه‌مون قویه که می‌تونیم با هم به هر چی می‌خوایم برسیم. 💪❤️"
         
-    elif call.data == "mood_happy":
-        response = "یادته لازانیایی که اون شب خونه ما درست کردی؟ من هر وقت به اون فکر می‌کنم، خوشحال می‌شم. 😍🍝"
+        # آپدیت کردن متن پیام
+        bot.edit_message_text(
+            text=response,
+            chat_id=chat_id,
+            message_id=call.message.message_id
+        )
+        # متوقف کردن حالت لودینگ دکمه
+        bot.answer_callback_query(call.id)
         
-    elif call.data == "mood_sad":
-        response = "هر وقت غمگین می‌شم پانیذ جان، به این فکر می‌کنم که ما با هم ۱۷، ۱۸ سالگی اون جنگ و همه اون بدبختی‌ها رو گذروندیم. پس انقدر رابطه‌مون قویه که می‌تونیم با هم به هر چی می‌خوایم برسیم. 💪❤️"
-    
-    # آپدیت کردن پیام قبلی با پیام جدید
-    bot.edit_message_text(
-        text=response,
-        chat_id=chat_id,
-        message_id=call.message.message_id
-    )
-    bot.answer_callback_query(call.id)
+    except Exception as e:
+        # جلوگیری از هنگ کردن ربات در صورت کلیک سریع یا خطای تلگرام
+        print(f"خطای جزئی در دکمه: {e}")
+        bot.answer_callback_query(call.id, text="صبر کن عزیزم...")
 
-# --- بخش Flask برای بیدار نگه داشتن رندر ---
+# --- بخش Flask برای بیدار نگه داشتن Render ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -75,10 +80,11 @@ def run_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, threaded=True)
 
-# اجرای فلask در یک ترد جداگانه
+# اجرای Flask در یک ترد جداگانه در پس‌زمینه
 flask_thread = threading.Thread(target=run_flask, daemon=True)
 flask_thread.start()
 
-# اجرای ربات (بدون هیچ فاصله اضافی در ابتدای خط)
+# اجرای ربات (بهینه‌شده برای جلوگیری از کندی و مصرف کمتر منابع)
+# ⚠️ مهم: این خط باید کاملاً به سمت چپ چسبیده باشد و هیچ فاصله‌ای قبل از آن نباشد
 print("🚀 ربات در حال اجراست...")
-bot.infinity_polling(timeout=60)
+bot.infinity_polling(timeout=60, allowed_updates=["message", "callback_query"])
