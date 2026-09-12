@@ -201,4 +201,4 @@ def close_menu(call):
     bot.delete_message(call.message.chat.id, call.message.message_id)
 
 print("✅ ربات با API ناوسان آماده است...")
-bot.infinity_polling()
+bot.infinity_polling(drop_pending_updates=True, timeout=60)
