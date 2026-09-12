@@ -40,26 +40,31 @@ def remove_user(chat_id):
 # دریافت قیمت دلار از API نوبیتکس (بازار آزاد)
 def get_dollar_price():
     try:
-        response = requests.get("https://api.nobitex.ir/v3/orderbook/USDTIRT", timeout=10)
+        # دریافت توکن آلن‌چند از تنظیمات سرور (یا می‌توانید مستقیم اینجا به جای YOUR_API_TOKEN بنویسید)
+        # پیشنهاد می‌شود توکن را در Environment Variables رندر وارد کنید
+        api_token = os.environ.get('ALANCHAND_API_TOKEN', 'YOUR_API_TOKEN')
+        
+        headers = {'Authorization': f'Bearer {api_token}'}
+        response = requests.get("https://api.alanchand.com?type=currency&symbols=usd", headers=headers, timeout=10)
         data = response.json()
         
-        if "lastTradePrice" in data:
-            price_rial = int(data["lastTradePrice"])
-            price_toman = price_rial // 10
-            return f"{price_toman:,} تومان"
-        else:
-            return "⚠️ خطا در دریافت قیمت"
+        # استخراج قیمت از پاسخ JSON آلن‌چند
+        # ساختار معمول آلن‌چند: {"data": {"usd": {"price": 60000, ...}}}
+        if "data" in data and "usd" in data["data"]:
+            usd_info = data["data"]["usd"]
+            # آلن‌چند معمولاً فیلد 'price' یا 'sell' را دارد
+            price = usd_info.get("price") or usd_info.get("sell")
+            
+            if price:
+                return f"{int(price):,} تومان"
+        
+        # اگر ساختار پاسخ متفاوت بود، در لاگ سرور چاپ می‌شود تا بتوانیم اصلاحش کنیم
+        print(f"پاسخ غیرمنتظره از آلن‌چند: {data}")
+        return "⚠️ خطا در خواندن قیمت"
+
     except Exception as e:
-        print(f"خطا در نوبیتکس: {e}")
-        try:
-            # API جایگزین: تترلند
-            response2 = requests.get("https://api.tetherland.com/currencies", timeout=10)
-            data2 = response2.json()
-            price = data2["data"]["currencies"]["USDT"]["price"]
-            return f"{int(price):,} تومان"
-        except Exception as e2:
-            print(f"خطا در تترلند: {e2}")
-            return "⚠️ خطا در اتصال. لطفاً دقایقی دیگر تلاش کنید."
+        print(f"خطا در دریافت قیمت از آلن‌چند: {e}")
+        return "⚠️ خطا در اتصال به سرور قیمت. لطفاً دقایقی دیگر تلاش کنید."
 
 # ارسال قیمت به همه کاربران
 def broadcast_price():
